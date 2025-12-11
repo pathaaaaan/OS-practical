@@ -1,103 +1,124 @@
+// Preemptive Shortest Remaining Time First (SRTF) - clean version (no Gantt chart)
 #include <stdio.h>
+#include <limits.h>
 #include <stdbool.h>
-struct process_struct
+#define MAX 100
+
+struct process
 {
-    float at;  // Arrival Time
-    float bt;  // Burst Time
-    float ct;  // Completion Time
-    float wt;  // Waiting Time
-    float tat; // Turnaround Time
-    float rt;  // Response Time
-    float start_time;
-    int process_num;
-} ps[100];
-int main()
+    int pid;        // process id
+    int at;         // arrival time
+    int bt;         // burst time
+    int bt_rem;     // remaining time
+    int start;      // response time start
+    int ct;         // completion time
+    int tat;        // turnaround time
+    int wt;         // waiting time
+    bool completed; // completion flag
+};
+
+int main(void)
 {
     int n;
-    float bt_remaining[100];
-    bool is_completed[100] = {false};
-    int current_time = 0;
-    int completed = 0;
-    printf("Enter total number of processes: ");
+    struct process ps[MAX];
+
+    printf("Enter total number of processes (max %d): ", MAX);
     scanf("%d", &n);
-    float sum_tat = 0, sum_wt = 0, sum_rt = 0;
-    printf("\nEnter Process Numbers: ");
-    for (int i = 0; i < n; i++)
+
+    // Read process IDs
+    printf("Enter Process IDs:\n");
+    for (int i = 0; i < n; ++i)
     {
-        scanf("%d", &ps[i].process_num);
+        scanf("%d", &ps[i].pid);
     }
-    printf("\nEnter Arrival Times: ");
-    for (int i = 0; i < n; i++)
+
+    // Read arrival times
+    printf("Enter Arrival Times:\n");
+    for (int i = 0; i < n; ++i)
     {
-        scanf("%f", &ps[i].at);
+        scanf("%d", &ps[i].at);
     }
-    printf("\nEnter Burst Times: ");
-    for (int i = 0; i < n; i++)
+
+    // Read burst times and initialize fields
+    printf("Enter Burst Times:\n");
+    for (int i = 0; i < n; ++i)
     {
-        scanf("%f", &ps[i].bt);
-        bt_remaining[i] = ps[i].bt;
+        scanf("%d", &ps[i].bt);
+        ps[i].bt_rem = ps[i].bt;
+        ps[i].start = -1;
+        ps[i].ct = ps[i].tat = ps[i].wt = 0;
+        ps[i].completed = false;
     }
-    while (completed != n)
+
+    int current_time = 0;
+    int completed_count = 0;
+    long sum_tat = 0, sum_wt = 0, sum_rt = 0;
+
+    // Main SRTF simulation loop
+    while (completed_count < n)
     {
-        int min_index = -1;
-        int minimum = 10000000;
-        for (int i = 0; i < n; i++)
+        int idx = -1;
+        int min_rem = INT_MAX;
+
+        // Find the shortest remaining time process that has arrived
+        for (int i = 0; i < n; ++i)
         {
-            if (ps[i].at <= current_time && is_completed[i] == false)
+            if (!ps[i].completed && ps[i].at <= current_time && ps[i].bt_rem > 0)
             {
-                if (bt_remaining[i] < minimum)
+                if (ps[i].bt_rem < min_rem)
                 {
-                    minimum = bt_remaining[i];
-                    min_index = i;
-                }
-                else if (bt_remaining[i] == minimum)
-                {
-                    if (ps[i].at < ps[min_index].at)
-                    {
-                        minimum = bt_remaining[i];
-                        min_index = i;
-                    }
+                    min_rem = ps[i].bt_rem;
+                    idx = i;
                 }
             }
         }
-        if (min_index == -1)
+
+        if (idx == -1)
         {
+            // No process available — CPU idle
             current_time++;
+            continue;
         }
-        else
+
+        // First time CPU touches this process → response time
+        if (ps[idx].start == -1)
         {
-            if (bt_remaining[min_index] == ps[min_index].bt)
-                ps[min_index].start_time = current_time;
-            bt_remaining[min_index] -= 1;
-            current_time++;
-            if (bt_remaining[min_index] == 0)
-            {
-                ps[min_index].ct = current_time;
-                ps[min_index].tat = ps[min_index].ct - ps[min_index].at;
-                ps[min_index].wt = ps[min_index].tat - ps[min_index].bt;
-                ps[min_index].rt = ps[min_index].start_time - ps[min_index].at;
-                sum_tat += ps[min_index].tat;
-                sum_wt += ps[min_index].wt;
-                sum_rt += ps[min_index].rt;
-                completed++;
-                is_completed[min_index] = true;
-            }
+            ps[idx].start = current_time;
+            sum_rt += (ps[idx].start - ps[idx].at);
+        }
+
+        // Execute for 1 time unit
+        ps[idx].bt_rem--;
+        current_time++;
+
+        // If finished
+        if (ps[idx].bt_rem == 0)
+        {
+            ps[idx].completed = true;
+
+            ps[idx].ct = current_time;
+            ps[idx].tat = ps[idx].ct - ps[idx].at;
+            ps[idx].wt = ps[idx].tat - ps[idx].bt;
+
+            sum_tat += ps[idx].tat;
+            sum_wt += ps[idx].wt;
+
+            completed_count++;
         }
     }
+
+    // Print results
     printf("\nProcess\tAT\tBT\tCT\tTAT\tWT\tRT\n");
-    for (int i = 0; i < n; i++)
+    for (int i = 0; i < n; ++i)
     {
-        printf("P%d\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\n",
-               ps[i].process_num,
-               ps[i].at,
-               ps[i].bt,
-               ps[i].ct,
-               ps[i].tat,
-               ps[i].wt,
-               ps[i].rt);
+        int rt = ps[i].start - ps[i].at;
+        printf("P%d\t%d\t%d\t%d\t%d\t%d\t%d\n",
+               ps[i].pid, ps[i].at, ps[i].bt, ps[i].ct, ps[i].tat, ps[i].wt, rt);
     }
-    printf("\nAverage Waiting Time = %.2f", sum_wt / n);
-    printf("\nAverage Response Time = %.2f", sum_rt / n);
-    printf("\nAverage Turnaround Time = %.2f\n", sum_tat / n);
+
+    printf("\nAverage Waiting Time = %.2f\n", (double)sum_wt / n);
+    printf("Average Turnaround Time = %.2f\n", (double)sum_tat / n);
+    printf("Average Response Time = %.2f\n", (double)sum_rt / n);
+
     return 0;
 }
