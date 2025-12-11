@@ -1,4 +1,4 @@
-// Preemptive Shortest Remaining Time First (SRTF) - clean version (no Gantt chart)
+// Preemptive Shortest Remaining Time First (SRTF) - Scheduling Algorithm in C
 #include <stdio.h>
 #include <limits.h>
 #include <stdbool.h>
